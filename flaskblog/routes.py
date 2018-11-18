@@ -140,8 +140,13 @@ def post(post_id):
     post = Post.query.get_or_404(post_id)
     form = DecryptForm()
     if form.validate_on_submit():
-        text = decrypt(form.key.data, form.iv.data, post.content)            
-        return download_file('Title: ' + str(post.title)  + '\nPlaintext: ' + str(text.decode('utf-8')), 'plaintext.csv')
+        try:
+            text = decrypt(form.key.data, form.iv.data, post.content)     
+            return download_file('Title: ' + str(post.title)  + '\nPlaintext: ' + str(text.decode('utf-8')), 'plaintext.csv')
+        except Exception as e:
+            return download_file('Please try again!', 'plaintext.csv')
+        
+        
         
     elif request.method == 'GET':
         return render_template('post.html', title=post.title, post=post, form=form, legend='Provide me the secret to get the secret message!')
