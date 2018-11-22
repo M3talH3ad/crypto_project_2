@@ -17,7 +17,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 from base64 import b64decode
 import hashlib
-import hmac
+import hmac, random
 import base64
 
 @app.route("/")
@@ -25,7 +25,7 @@ import base64
 def home():
     page = request.args.get('page', 1, type=int)
     posts = Post.query.order_by(Post.date_posted.desc()).paginate(page=page, per_page=5)
-    return render_template('home.html', posts=posts)
+    return render_template('home.html', posts=posts, shuffle_string = lambda x: ''.join(random.sample(str(x),len(str(x)))))
 
 
 @app.route("/about")
