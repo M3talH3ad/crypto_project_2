@@ -4,7 +4,7 @@ from PIL import Image
 from flask import render_template, url_for, flash, redirect, request, abort, make_response, send_file
 from flaskblog import app, db, bcrypt
 from flaskblog.forms import RegistrationForm, LoginForm, UpdateAccountForm, PostForm, DecryptForm
-from flaskblog.models import User, Post
+from flaskblog.models import User, Post, Hmac
 from flask_login import login_user, current_user, logout_user, login_required
 import binascii
 import rsa
@@ -23,9 +23,9 @@ import base64
 @app.route("/")
 @app.route("/home")
 def home():
-    # page = request.args.get('page', 1, type=int)
-    # posts = Post.query.order_by(Post.date_posted.desc()).paginate(page=page, per_page=5)
-    return render_template('home.html')
+    page = request.args.get('page', 1, type=int)
+    posts = Post.query.order_by(Post.date_posted.desc()).paginate(page=page, per_page=5)
+    return render_template('home.html', posts=posts)
 
 
 @app.route("/about")
@@ -114,21 +114,40 @@ def new_post():
         data = json.loads(data.decode("utf-8"))
         signature = check_hmac(data['title']+data['content']+data['key'], data['hmac'])
 
-        
-
         if str(data["hash"]) != str(signature.decode('utf-8')): return 'Man in the middle detected'
 
+        data['content'] = data['content'].strip()
+        data['title'] = data['title'].strip()
 
-        iv = generate_iv()
-        key = data['key']
+        title = hash_sha256(data['title'])
 
-        cipher_text = encrypt(key, iv, data['content'])    
-        post = Post(title=data['title'], content=cipher_text, author=current_user)
-        
-        db.session.add(post)
-        db.session.commit()
-        
-        text = 'key: ' + key +'\niv: ' + iv + '\nurl is: ' + 'post/' + str(post.id)
+        res = Hmac.query.filter_by(title=title).all()
+        if res:
+            return 'Title is already in use!'
+
+        content = hash_sha256(data['content'])
+        res = Hmac.query.filter_by(content=content).all()
+        if res:
+            return'Content is already in use!'
+
+        try: 
+            iv = generate_iv()
+            key = data['key']
+            
+            cipher_text = encrypt(key, iv, data['content'])
+            cipher_title = encrypt(key, iv, data['title'])
+            post = Post(title=cipher_title, content=cipher_text, author=current_user)
+            db.session.add(post)
+            db.session.commit()
+
+            hmac = Hmac(title=title, content=content, author=post)
+            db.session.add(hmac)
+            db.session.commit()
+
+            text = 'key: ' + key +'\niv: ' + iv + '\nurl is: ' + 'post/' + str(post.id)
+        except Exception as e:
+            return str(e)
+
         return text
 
     return render_template('create_post.html', title='New Post',
@@ -141,46 +160,51 @@ def post(post_id):
     form = DecryptForm()
     if form.validate_on_submit():
         try:
-            text = decrypt(form.key.data, form.iv.data, post.content)     
-            return download_file('Title: ' + str(post.title)  + '\nPlaintext: ' + str(text.decode('utf-8')), 'plaintext.csv')
+            text = decrypt(form.key.data, form.iv.data, post.content)
+            title = decrypt(form.key.data, form.iv.data, post.title)
+            return download_file('Title: ' + str(title.decode('utf-8'))  + '\nPlaintext: ' + str(text.decode('utf-8')), 'plaintext.csv')
         except Exception as e:
             return download_file('Please try again!', 'plaintext.csv')
-        
-        
-        
+
     elif request.method == 'GET':
         return render_template('post.html', title=post.title, post=post, form=form, legend='Provide me the secret to get the secret message!')
     
     
 
-@app.route("/post/<int:post_id>/update", methods=['GET', 'POST'])
-@login_required
-def update_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    if post.author != current_user:
-        abort(403)
-    form = PostForm()
-    if form.validate_on_submit():
-        post.title = form.title.data
-        post.content = form.content.data
-        db.session.commit()
-        flash('Your post has been updated!', 'success')
-        return redirect(url_for('post', post_id=post.id))
-    elif request.method == 'GET':
-        form.title.data = post.title
-        form.content.data = post.content
-    return render_template('create_post.html', title='Update Post',
-                           form=form, legend='Update Post')
+# @app.route("/post/<int:post_id>/update", methods=['GET', 'POST'])
+# @login_required
+# def update_post(post_id):
+#     post = Post.query.get_or_404(post_id)
+#     if post.author != current_user:
+#         abort(403)
+#     form = PostForm()
+#     if form.validate_on_submit():
+#         post.title = form.title.data
+#         post.content = form.content.data
+#         db.session.commit()
+#         flash('Your post has been updated!', 'success')
+#         return redirect(url_for('post', post_id=post.id))
+#     elif request.method == 'GET':
+#         form.title.data = post.title
+#         form.content.data = post.content
+#     return render_template('create_post.html', title='Update Post',
+#                            form=form, legend='Update Post')
 
 
 @app.route("/post/<int:post_id>/delete", methods=['POST'])
 @login_required
 def delete_post(post_id):
+
+    hmac = Hmac.query.filter_by(post_id=post_id).first_or_404()
+    db.session.delete(hmac)
+    db.session.commit()
+
     post = Post.query.get_or_404(post_id)
     if post.author != current_user:
         abort(403)
     db.session.delete(post)
     db.session.commit()
+
     flash('Your post has been deleted!', 'success')
     return redirect(url_for('home'))
 
@@ -251,3 +275,8 @@ def check_hmac(message, key):
     secret = key.encode('utf-8')
     signature = base64.b64encode(hmac.new(secret, message, digestmod=hashlib.sha256).digest())
     return  signature
+
+def hash_sha256(hash_string):
+    sha_signature = hashlib.sha256(hash_string.encode()).hexdigest()
+    return sha_signature
+
