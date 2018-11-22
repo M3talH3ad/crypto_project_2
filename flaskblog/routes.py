@@ -146,7 +146,7 @@ def new_post():
 
             text = 'key: ' + key +'\niv: ' + iv + '\nurl is: ' + 'post/' + str(post.id)
         except Exception as e:
-            return str(e)
+            return str('Error occured!')
 
         return text
 

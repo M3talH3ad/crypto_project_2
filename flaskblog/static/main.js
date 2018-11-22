@@ -38,6 +38,10 @@ function yooo(e) {
 	});
 }
 
+if ($('.hmac').data())
+	{
+		$('#key').prop("disabled", "disabled");
+	}
 // yooo
 // function rsa_encrypt(argument) {
 // 	var publicKey = forge.pki.publicKeyFromPem(argument);

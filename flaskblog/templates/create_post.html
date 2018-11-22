@@ -22,7 +22,7 @@
             <div class="form-group">
                 {{ form.key.label(class="form-control-label") }}
                 {% if form.key.errors %}
-                    {{ form.title(class="form-control form-control-lg is-invalid") }}
+                    {{ form.key(class="form-control form-control-lg is-invalid") }}
                     <div class="invalid-feedback">
                         {% for error in form.key.errors %}
                             <span>{{ error }}</span>
