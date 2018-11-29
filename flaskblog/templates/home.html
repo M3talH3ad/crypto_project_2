@@ -8,7 +8,7 @@
               <a class="mr-2" href="{{ url_for('user_posts', username=post.author.username) }}">{{ post.author.username }}</a>
               <small class="text-muted">{{ post.date_posted.strftime('%Y-%m-%d') }}</small>
             </div>
-            <h2><a class="article-title" href="{{ url_for('post', post_id=post.id) }}">{{ shuffle_string(post.title) }}</a></h2>
+            <h2><a class="article-title" href="{{ url_for('post', post_id=post.id) }}" style="word-break: break-all;">{{ shuffle_string(post.title) }}</a></h2>
             <p class="article-content" style="word-break: break-all;">{{ shuffle_string(post.content) }}</p>
           </div>
         </article>

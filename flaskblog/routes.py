@@ -4,16 +4,16 @@ from PIL import Image
 from flask import render_template, url_for, flash, redirect, request, abort, make_response, send_file
 from flaskblog import app, db, bcrypt
 from flaskblog.forms import RegistrationForm, LoginForm, UpdateAccountForm, PostForm, DecryptForm
-from flaskblog.models import User, Post, Hmac
+from flaskblog.models import User, Post, Hmac, Replay
 from flask_login import login_user, current_user, logout_user, login_required
 import binascii
-import rsa
+# import rsa
 import crypto
 import sys, json
 sys.modules['Crypto'] = crypto
-from Crypto.Cipher import AES
-from Crypto.Cipher import PKCS1_OAEP
-from Crypto.PublicKey import RSA
+# from Crypto.Cipher import AES
+# from Crypto.Cipher import PKCS1_OAEP
+# from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 from base64 import b64decode
 import hashlib
@@ -23,6 +23,8 @@ import base64
 @app.route("/")
 @app.route("/home")
 def home():
+    if not current_user.is_authenticated:
+        return redirect(url_for('login'))
     page = request.args.get('page', 1, type=int)
     posts = Post.query.order_by(Post.date_posted.desc()).paginate(page=page, per_page=5)
     return render_template('home.html', posts=posts, shuffle_string = lambda x: ''.join(random.sample(str(x),len(str(x)))))
@@ -109,12 +111,22 @@ def account():
 @login_required
 def new_post():
     form = PostForm()
+    replay_token = generate_iv()
     if request.method == 'POST':
         data = request.data
         data = json.loads(data.decode("utf-8"))
-        signature = check_hmac(data['title']+data['content']+data['key'], data['hmac'])
+        signature = check_hmac(data['title']+data['content'], data['hmac'])
 
-        if str(data["hash"]) != str(signature.decode('utf-8')): return 'Man in the middle detected'
+        if str(data["hash"]) != str(signature.decode('utf-8')): 
+            flash('Man in the middle detected', 'warning')
+            return redirect(url_for('login'))
+            # return 'Man in the middle detected'
+
+        res = Replay.query.filter_by(text=replay_token).all()
+
+        if res and res.used == 1:
+            flash('Replay attack tried', 'warning')
+            return redirect(url_for('login'))
 
         data['content'] = data['content'].strip()
         data['title'] = data['title'].strip()
@@ -123,20 +135,16 @@ def new_post():
 
         res = Hmac.query.filter_by(title=title).all()
         if res:
-            return 'Title is already in use!'
+            return '1'
 
         content = hash_sha256(data['content'])
         res = Hmac.query.filter_by(content=content).all()
         if res:
-            return'Content is already in use!'
+            return '2'
 
         try: 
             iv = generate_iv()
-            key = data['key']
-            
-            cipher_text = encrypt(key, iv, data['content'])
-            cipher_title = encrypt(key, iv, data['title'])
-            post = Post(title=cipher_title, content=cipher_text, author=current_user)
+            post = Post(title=data['title_encrypted'], content=data['content_encrypted'], author=current_user, title_unencrypted=data['title'], content_unencrypted=data['content'])
             db.session.add(post)
             db.session.commit()
 
@@ -144,32 +152,40 @@ def new_post():
             db.session.add(hmac)
             db.session.commit()
 
-            text = 'key: ' + key +'\niv: ' + iv + '\nurl is: ' + 'post/' + str(post.id)
+            replay = Replay.query.get(5)
+            replay.used = 1
+            db.session.commit()
+
+
+            # text = 'key: ' + key +'\niv: ' + iv + '\nurl is: ' + 'post/' + str(post.id)
+            text = 'key: ' 
         except Exception as e:
             return str('Error occured!')
 
         return text
 
+    hmac = Replay(text=replay_token, used=0)
+    db.session.add(hmac)
+    db.session.commit()
     return render_template('create_post.html', title='New Post',
-                           form=form, legend='New Post')
+                           form=form, legend='New Post', replay_token=replay_token)
 
 
 @app.route("/post/<int:post_id>", methods=['GET', 'POST'])
 def post(post_id):
+    if not current_user.is_authenticated:
+        return redirect(url_for('home'))
     post = Post.query.get_or_404(post_id)
     form = DecryptForm()
-    if form.validate_on_submit():
-        try:
-            text = decrypt(form.key.data, form.iv.data, post.content)
-            title = decrypt(form.key.data, form.iv.data, post.title)
-            return download_file('Title: ' + str(title.decode('utf-8'))  + '\nPlaintext: ' + str(text.decode('utf-8')), 'plaintext.csv')
-        except Exception as e:
-            return download_file('Please try again!', 'plaintext.csv')
+    iamowner = False
+    # if pppp == 1: iamowner=True
+    if request.method == 'POST':
+        return render_template('post.html', title=post.title, post=post, form=form, iamowner=True, legend='Provide me the secret to get the secret message!')
 
     elif request.method == 'GET':
-        return render_template('post.html', title=post.title, post=post, form=form, legend='Provide me the secret to get the secret message!')
-    
-    
+        return render_template('post.html', title=post.title, post=post, form=form, iamowner=iamowner, legend='Provide me the secret to get the secret message!')
+
+
 
 # @app.route("/post/<int:post_id>/update", methods=['GET', 'POST'])
 # @login_required

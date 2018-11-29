@@ -4,7 +4,7 @@
     <form method="POST" action="">
         {{ form.hidden_tag() }}
         <fieldset class="form-group">
-            <div class='hmac' data-hmac='edf42a706eff6f5494a5f18efe6fbfbcc1e9faf4'></div>
+            <div class='hmac' data-hmac='edf42a706eff6f5494a5f18efe6fbfbcc1e9faf4' data-replay= "{{ replay_token }}"></div>
             <legend class="border-bottom mb-4">{{ legend }}</legend>
             <div class="form-group">
                 {{ form.title.label(class="form-control-label") }}

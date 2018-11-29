@@ -23,13 +23,15 @@ class User(db.Model, UserMixin):
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.Text, nullable=False)
+    title_unencrypted = db.Column(db.Text, nullable=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     content = db.Column(db.Text, nullable=False)
+    content_unencrypted = db.Column(db.Text, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     hmac = db.relationship('Hmac', backref='author', lazy=True)
 
     def __repr__(self):
-        return f"Post('{self.title}', '{self.date_posted}', '{self.content}')"
+        return f"Post('{self.title}', '{self.date_posted}', '{self.content}', '{self.content_unencrypted}')"
 
 class Hmac(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -40,3 +42,14 @@ class Hmac(db.Model):
 
     def __repr__(self):
         return f"Hmac('{self.title}', '{self.date_posted}', '{self.content}')"
+
+
+class Replay(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=False)
+    used = db.Column(db.Integer, nullable=False)
+    date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+    def __repr__(self):
+        return f"Replay('{self.text}', '{self.date_posted}', '{self.used}')"
