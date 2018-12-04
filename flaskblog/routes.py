@@ -54,6 +54,7 @@ def register():
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('home'))
+    replay_token = generate_iv()
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
@@ -63,7 +64,7 @@ def login():
             return redirect(next_page) if next_page else redirect(url_for('home'))
         else:
             flash('Login Unsuccessful. Please check email and password', 'danger')
-    return render_template('login.html', title='Login', form=form)
+    return render_template('login.html', title='Login', form=form, replay_token=replay_token)
 
 
 @app.route("/logout")
@@ -121,12 +122,11 @@ def new_post():
             flash('Man in the middle detected', 'warning')
             return redirect(url_for('login'))
             # return 'Man in the middle detected'
-
-        res = Replay.query.filter_by(text=replay_token).all()
-
-        if res and res.used == 1:
-            flash('Replay attack tried', 'warning')
-            return redirect(url_for('login'))
+        replay_token = data['replay_token']
+        res = Replay.query.get(replay_token)
+        # print(res[0])
+        if (res and res.used == 1) or not res:
+            return '3'
 
         data['content'] = data['content'].strip()
         data['title'] = data['title'].strip()
@@ -152,7 +152,7 @@ def new_post():
             db.session.add(hmac)
             db.session.commit()
 
-            replay = Replay.query.get(5)
+            replay = Replay.query.get(replay_token)
             replay.used = 1
             db.session.commit()
 

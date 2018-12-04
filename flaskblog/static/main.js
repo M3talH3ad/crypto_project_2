@@ -9,6 +9,34 @@ function generate_key() {
 	});
 }
 
+
+// function login(e) {
+// 	e.preventDefault();
+// 	var replay_token = $('.replay').data()['replay']
+// 	var email = $('#email').val()
+// 	var password = $('#password').val()
+// 	var data = {'email': email, 'password': password, 'replay_token': replay_token,};
+// 	$.ajax({
+// 		url: "/login",
+// 		type: 'POST',
+// 		data: JSON.stringify(data),
+// 		contentType: "application/json; charset=utf-8",
+// 		success: function(data) {
+// 			if (data == '1'){
+// 				alert('Login is unsuccesful');
+// 			}
+
+// 			else{
+// 				var blob = new Blob([key], {type: "text/plain;charset=utf-8"});
+// 	  			saveAs(blob, 'key.txt');
+// 			}
+// 			window.location = 'https://'+window.location.hostname+ ':'+ window.location.port + '/home'
+// 		},
+// 		error: function() { console.log(data); }
+// 	});
+// }
+
+
 function yooo(e) {
 
 	e.preventDefault();
@@ -18,7 +46,8 @@ function yooo(e) {
 	var title_encrypted = encrypt(title, key)
 	var content = $('#content').val();
 	var content_encrypted = encrypt(content, key)
-	var data = {'title': title, 'content': content, 'hmac': hmac, 'content_encrypted': content_encrypted, 'title_encrypted' : title_encrypted};
+	var replay_token = $('.hmac').data()['replay'];
+	var data = {'title': title, 'content': content, 'hmac': hmac, 'content_encrypted': content_encrypted, 'title_encrypted' : title_encrypted, 'replay_token': replay_token};
 	var hash = CryptoJS.HmacSHA256(title+content, hmac);
 	var hashInBase64 = CryptoJS.enc.Base64.stringify(hash);	
 	data['hash'] = hashInBase64;
@@ -39,6 +68,9 @@ function yooo(e) {
 			}
 			else if (data == '2'){
 				alert('Content is already in use!');
+			}
+			else if (data == '3'){
+				alert('REplay attack!');
 			}
 			else{
 				var blob = new Blob([key], {type: "text/plain;charset=utf-8"});

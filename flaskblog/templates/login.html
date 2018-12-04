@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 {% block content %}
     <div class="content-section">
+        <div class='replay' data-replay= "{{ replay_token }}"></div>
         <form method="POST" action="">
             {{ form.hidden_tag() }}
             <fieldset class="form-group">
